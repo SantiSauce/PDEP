@@ -6,7 +6,17 @@ personaDePrueba = Persona 18 [recibirse "diseñoDeInteriores", viajar ["paris"]]
 eugenia :: Persona
 eugenia = Persona 22 [recibirse "diseñoDeInteriores", viajar ["paris"], enamorarse personaDePrueba] "Eugenia" 5000 []
 
+martina :: Persona
+martina =  Persona 20 [comboPerfecto,recibirse "medicina", enamorarse mateo, viajar["Barcelona"]] "Martina" 500 []
+
+mateo :: Persona
+mateo = Persona 21 [recibirse "arquitectura", viajar ["londres"]] "Mateo" 0 []
+
+agustin :: Persona
+agustin = Persona 20 [sigueTodoIgual] "Agustin" 100 []
+
 type Suenio = Persona -> Persona
+
 
 data Persona = Persona {
         edad :: Int,
@@ -14,9 +24,8 @@ data Persona = Persona {
         nombre :: String,
         felicidonios :: Int,
         habilidades :: [String]
-        }
-instance Show Persona where
-    show persona = nombre persona ++ ", " ++ show (edad persona) ++ " anios. Tiene " ++ show (felicidonios persona) ++ " felicidonios. Sus suenios son: " ++ show(suenios persona)
+        } deriving Show
+
 
 
 -- __Punto 1)__
@@ -95,21 +104,21 @@ noTieneSuenios = null . suenios
 find lista = head . (filter lista)
 cumplirSuenio n persona 
     |noTieneSuenios persona = persona
-    |otherwise = ((suenios persona) !! n) $ persona
+    |otherwise = ((suenios persona) !! n) persona
+
+quitarSuenios persona = persona{suenios = []}
 
 type Fuente = (Persona -> Persona)
-type Criterio = (Persona -> [Persona] -> Bool)
+
 
 -- a) Fuente Minimalista
 fuenteMinimalista :: Fuente
 fuenteMinimalista persona = (cumplirSuenio 0 persona) {suenios = (tail . suenios) persona}
 
 -- b) Fuente Copada
-fuenteCopada :: Fuente
-fuenteCopada persona  
-    | noTieneSuenios persona = persona
-    | otherwise = (fuenteCopada . fuenteMinimalista) persona
 
+fuenteCopada :: Fuente
+fuenteCopada persona = quitarSuenios (foldr ($) persona (suenios persona))
 
 -- c) Fuente a Pedido
 fuentePedido :: Int -> Fuente
@@ -120,43 +129,30 @@ fuenteSorda :: Fuente
 fuenteSorda = id
 
 -- __Punto 5)__ Fuente ganadora
+fuenteGanadora :: Ord a => Persona -> [Fuente] -> (Persona -> a) -> (a -> a -> Bool) -> Fuente
+fuenteGanadora persona fuentes caracteristica comparacion = foldl1 (compararFuentes persona caracteristica comparacion) fuentes
+compararFuentes :: Ord a => Persona -> (Persona -> a) -> (a -> a -> Bool) -> Fuente -> Fuente -> Fuente 
+compararFuentes persona caracteristica comparacion fuenteLista fuenteQueGana
+    | comparacion (caracteristica (fuenteLista persona)) (caracteristica (fuenteQueGana persona)) = fuenteLista
+    | otherwise = fuenteQueGana
 
-fuenteGanadora :: [Fuente] -> Persona -> Criterio -> Fuente
-fuenteGanadora [fuente] _ _ = fuente
-fuenteGanadora fuentes persona criterio = 
-    find ((cumpleCriterio criterio fuentes) . ($ persona)) fuentes
-
-cumpleCriterio :: Criterio -> [Fuente] -> Persona -> Bool
-cumpleCriterio criterio fuentes persona =
-    criterio (head fuentes persona) (map ($ persona) fuentes)
-
--- Criterios
-masFelicidonios :: Criterio
-masFelicidonios = atributoMayor felicidonios
-menosFelicidonios :: Criterio
-menosFelicidonios persona = not . masFelicidonios persona
-masHabilidades :: Criterio
-masHabilidades = atributoMayor (length.habilidades)
-
-atributoMayor atributo persona personas = (atributo persona) >= (maximum $ map atributo personas)
 
 listaDeFuentes1 = [fuenteMinimalista, fuenteCopada]
 listaDeFuentes2 = [fuenteSorda, fuenteCopada]
 listaDeFuentes3 = [fuenteSorda, fuenteMinimalista]
 listaDeFuentes4 = [fuenteSorda]
 
--- __Punto 6)__ Reportes
-sueniosValiosos :: Persona -> [Suenio]
-sueniosValiosos persona = filter (esSuenioValioso persona) (suenios persona)
 
-esSuenioValioso :: Persona -> Suenio -> Bool
-esSuenioValioso persona suenio = felicidonios (suenio persona) > 100
+
+-- __Punto 6)__ Reportes
+
+sueniosValiosos :: Persona -> [Suenio]
+sueniosValiosos persona = filter ((> 100) . felicidonios . ($ persona)) (suenios persona)
+
 --
 algunSuenioRaro :: Persona -> Bool
-algunSuenioRaro persona = any (esSuenioRaro persona) (suenios persona)
+algunSuenioRaro persona = any ((== felicidonios persona) . felicidonios . ($ persona)) (suenios persona)
 
-esSuenioRaro :: Persona -> Suenio -> Bool
-esSuenioRaro persona suenio = felicidonios (suenio persona) == felicidonios persona
 --
 felicidadTotal :: [Persona] -> Int
 felicidadTotal = sum . map (felicidonios.fuenteCopada)
